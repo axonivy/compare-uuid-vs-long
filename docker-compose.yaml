@@ -1,0 +1,78 @@
+version: "3.3"
+
+services:
+
+  elasticsearch:
+    image: "elasticsearch:7.17.3"
+    ports:
+     - "9200:9200"
+    environment:
+      - "discovery.type=single-node"
+
+
+  postgres14db:
+    image: postgres:14
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: nimda
+
+  postgres14:
+    image: dockage/phppgadmin
+    ports:
+      - 8885:80
+    links: 
+      - postgres14db:db
+    environment:
+      PHP_PG_ADMIN_SERVER_HOST: db
+
+
+  mysql8db:
+    image: mysql:8
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: nimda
+
+  mysql8:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - 8883:80
+    links: 
+      - mysql8db:db
+    environment:      
+      MYSQL_ROOT_PASSWORD: nimda
+
+
+
+  mariadb10db:
+    image: mariadb:10
+    ports:
+      - 3010:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: nimda
+      
+  mariadb10:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - 8884:80
+    links: 
+      - mariadb10db:db
+    environment:      
+      MYSQL_ROOT_PASSWORD: nimda
+
+
+  mssql2019:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    ports:
+      - 1433:1433
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: secure1234PASSWORD!
+      
+  oracle19c:
+    image: docker-registry.ivyteam.io/oracle/database-orapdb:19.3.0-se2
+    ports:
+      - 1521:1521
+      - 5529:5500
