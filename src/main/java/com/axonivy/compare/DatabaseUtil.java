@@ -1,9 +1,6 @@
 package com.axonivy.compare;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -13,8 +10,21 @@ public class DatabaseUtil {
   public static void create() {
     if (getTables().isEmpty()) {
       createTaskTable();
-      createSecurityMemberTable(PrimaryKeyType.LONG.getValue());
+      createSecurityMemberTables();
     }
+  }
+
+  private static void createTaskTable() {
+    executeQuery(createTaskTableSqlStatement());
+    System.out.println("Task table was created.");
+  }
+
+  private static void isConnectionError(Exception e) {
+    var errorStrings = Arrays.asList("connection", "refused");
+    if (errorStrings.stream().allMatch(e.getMessage()::contains)) {
+      System.out.println("Could not connect to database.");
+    }
+    System.out.println(e.getMessage());
   }
 
   public static List<String> getTables() {
@@ -33,41 +43,35 @@ public class DatabaseUtil {
     return tableList;
   }
 
-  public static boolean createTaskTable() {
-    try (Connection connection = getConnection()) {
-      Statement statement = connection.createStatement();
-      String taskTableSql = "CREATE TABLE IF NOT EXISTS Task ("
-              + "Id BIGINT NOT NULL,"
-              + "Name VARCHAR(255) NOT NULL,"
-              + "UserId BIGINT NOT NULL,"
-              + "UserRawUuid VARCHAR(255) NOT NULL,"
-              + "UserUuid VARCHAR(255) NOT NULL,"
-              + "PRIMARY KEY (Id)"
-              + ")";
-      statement.execute(taskTableSql);
-    } catch (SQLException e) {
-      var errorStrings = Arrays.asList("connection", "refused");
-      if (errorStrings.stream().allMatch(e.getMessage()::contains)) {
-        System.out.println("Could not connect to database.");
-        return false;
-      }
-      System.out.println(e.getMessage());
-      return false;
-    }
-    return true;
+  private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
+    return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
+            + "Id " + (bigint ? "BIGINT" : "VARCHAR(255)") + " NOT NULL,"
+            + "Name VARCHAR(255) NOT NULL,"
+            + "PRIMARY KEY (Id)"
+            + ")";
   }
 
-  public static void createSecurityMemberTable(String primaryKeyType) {
+  private static String createTaskTableSqlStatement() {
+    return "CREATE TABLE IF NOT EXISTS Task ("
+            + "Id BIGINT NOT NULL,"
+            + "Name VARCHAR(255) NOT NULL,"
+            + "UserId BIGINT NOT NULL,"
+            + "UserRawUuid VARCHAR(255) NOT NULL,"
+            + "UserUuid VARCHAR(255) NOT NULL,"
+            + "PRIMARY KEY (Id)"
+            + ")";
+  }
+
+  public static void createSecurityMemberTables() {
     try (Connection connection = getConnection()) {
       Statement statement = connection.createStatement();
-      String taskTableSql = "CREATE TABLE IF NOT EXISTS SecurityMember ("
-              + "Id " + primaryKeyType + " NOT NULL,"
-              + "Name VARCHAR(255) NOT NULL,"
-              + "PRIMARY KEY (Id)"
-              + ")";
-      statement.execute(taskTableSql);
+      var tablesList = Arrays.asList("SecurityMemberLong", "SecurityMemberUuid", "SecurityMemberRawUuid");
+      for (var table : tablesList) {
+        statement.executeUpdate(createSecurityMemberSqlStatement(table, table.contains("Long")));
+      }
+      System.out.println("SecurityMember tables created.");
     } catch (SQLException e) {
-      throw new RuntimeException(e);
+      isConnectionError(e);
     }
   }
 
@@ -84,19 +88,8 @@ public class DatabaseUtil {
         sb.append(result.getString("UserUuid")).append(" ");
         sb.append("\n");
       }
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-    return sb.toString();
-  }
-
-  public static String executeQuery(String query) {
-    StringBuilder sb = new StringBuilder();
-    try (Connection connection = getConnection()) {
-      Statement statement = connection.createStatement();
-      sb.append(statement.executeQuery(query));
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
+    } catch (Exception e) {
+      isConnectionError(e);
     }
     return sb.toString();
   }

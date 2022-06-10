@@ -18,11 +18,11 @@ public class Menu {
   }
 
   public static void printMainMenu() {
-    clearConsole();
     printFile("MainMenu.txt");
     System.out.print("Enter your choice: ");
     try (Scanner scanner = new Scanner(System.in)) {
       var choice = scanner.nextInt();
+      clearConsole();
       processInput(choice);
     }
   }
@@ -35,9 +35,9 @@ public class Menu {
       case 4 -> System.exit(0);
       default -> {
         System.out.println("Invalid input!");
-        printMainMenu();
       }
     }
+    printMainMenu();
   }
 
   private static void createDb() {
