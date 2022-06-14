@@ -158,18 +158,18 @@ public class DatabaseUtil {
     return null;
   }
 
-  public static String read() {
+  public static String findTasks(String columnName, String value) {
     StringBuilder sb = new StringBuilder();
     try (Connection connection = getConnection()) {
-      Statement statement = connection.createStatement();
-      var result = statement.executeQuery("SELECT * FROM Task");
-      while (result.next()) {
-        sb.append(result.getString("Id")).append(" ");
-        sb.append(result.getString("Name")).append(" ");
-        sb.append(result.getString("UserId")).append(" ");
-        sb.append(result.getString("UserRawUuid")).append(" ");
-        sb.append(result.getString("UserUuid")).append(" ");
-        sb.append("\n");
+      var statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
+      if (columnName.equals("UserId")) {
+        statement.setInt(1, Integer.parseInt(value));
+      } else {
+        statement.setString(1, value);
+      }
+      var resultSet = statement.executeQuery();
+      while (resultSet.next()) {
+        sb.append(resultSet.getString("Id")).append(" ").append(resultSet.getString("Name")).append(" ").append(resultSet.getString("UserId")).append(" ").append(resultSet.getString("UserUuid")).append(" ").append(resultSet.getString("UserRawUuid")).append("\n");
       }
     } catch (Exception e) {
       isConnectionError(e);
