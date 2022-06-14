@@ -1,17 +1,17 @@
 package com.axonivy.compare;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class DatabaseUtil {
 
   public static void create() {
-    if (getTables().isEmpty()) {
+    if (getTablesFromDb().isEmpty()) {
       createSecurityMemberTables();
       createTaskTable();
+    }
+    else {
+      System.out.println("Tables already exist.");
     }
   }
 
@@ -27,7 +27,7 @@ public class DatabaseUtil {
 
   private static String createTaskTableSqlStatement() {
     return "CREATE TABLE IF NOT EXISTS Task ("
-            + "Id BIGINT NOT NULL,"
+            + "Id SERIAL,"
             + "Name VARCHAR(255) NOT NULL,"
             + "UserId BIGINT NOT NULL,"
             + "UserRawUuid VARCHAR(255) NOT NULL,"
@@ -57,13 +57,13 @@ public class DatabaseUtil {
 
   private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
     return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
-            + "Id " + (bigint ? "BIGINT" : "VARCHAR(255)") + " NOT NULL,"
+            + "Id " + (bigint ? "SERIAL" : "VARCHAR(255) NOT NULL") + ","
             + "Name VARCHAR(255) NOT NULL,"
             + "PRIMARY KEY (Id)"
             + ")";
   }
 
-  public static void createSecurityMember(String tableName, String userName) {
+  public static void insertSecurityMemberToDb(String tableName, String userName) {
     var createMemberStatement = "INSERT INTO " + tableName + " (Name) VALUES (?)";
     if (!tableName.contains("Long")) {
       createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
@@ -85,6 +85,42 @@ public class DatabaseUtil {
     }
   }
 
+  public static void insertTaskToDb(String taskName, List<String> userIds) {
+    var createMemberStatement = "INSERT INTO Task (Name, UserId, UserUuid, UserRawUuid) VALUES (?, ?, ?, ?)";
+    try (Connection connection = getConnection()) {
+      PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
+      preparedStatement.setString(1, taskName);
+      preparedStatement.setInt(2, Integer.parseInt(userIds.get(0)));
+      preparedStatement.setString(3, userIds.get(1));
+      preparedStatement.setString(4, userIds.get(2));
+      preparedStatement.executeUpdate();
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+  }
+
+  public static boolean entriesAlreadyExist(String tableName) {
+    return entriesAlreadyExist(tableName, 1);
+  }
+
+  public static boolean entriesAlreadyExist(String tableName, int amountOfEntries) {
+    var tables = getTablesFromDb();
+    if (tables.isEmpty()) {
+      return false;
+    }
+    try (Connection connection = getConnection()) {
+      Statement statement = connection.createStatement();
+      var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
+      if (resultSet.next()) {
+        var count = resultSet.getInt(1);
+        return count >= amountOfEntries;
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    return false;
+  }
+
   private static void isConnectionError(Exception e) {
     var errorStrings = Arrays.asList("connection", "refused");
     if (errorStrings.stream().allMatch(e.getMessage()::contains)) {
@@ -93,7 +129,7 @@ public class DatabaseUtil {
     System.out.println(e.getMessage());
   }
 
-  public static List<String> getTables() {
+  public static List<String> getTablesFromDb() {
     var tableList = new ArrayList<String>();
     try (Connection connection = getConnection()) {
       Statement statement = connection.createStatement();
@@ -107,6 +143,19 @@ public class DatabaseUtil {
       throw new RuntimeException(e);
     }
     return tableList;
+  }
+
+  public static String getRandomUser(String tableName) {
+    try (Connection connection = getConnection()) {
+      Statement statement = connection.createStatement();
+      var resultSet = statement.executeQuery("SELECT Id FROM " + tableName + " ORDER BY RANDOM() LIMIT 1");
+      if (resultSet.next()) {
+        return resultSet.getString(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+    return null;
   }
 
   public static String read() {
@@ -126,6 +175,19 @@ public class DatabaseUtil {
       isConnectionError(e);
     }
     return sb.toString();
+  }
+
+  public static void cleanupDatabase() {
+    try (Connection connection = getConnection()) {
+      Statement statement = connection.createStatement();
+      statement.executeUpdate("DROP TABLE IF EXISTS Task");
+      for (var table : getSecMemberTableNames()) {
+        statement.executeUpdate("DROP TABLE IF EXISTS " + table);
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    System.out.println("Database cleaned up.");
   }
 
   private static Connection getConnection() throws SQLException {

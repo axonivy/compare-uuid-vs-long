@@ -4,9 +4,10 @@ import java.io.IOException;
 import java.util.Scanner;
 
 public class Menu {
+  static final Scanner scan = new Scanner(System.in);
 
   private static void printFile(String filename) {
-    var inputStream = Menu.class.getClassLoader().getResourceAsStream("menus/"+filename);
+    var inputStream = Menu.class.getClassLoader().getResourceAsStream("menus/" + filename);
     try {
       assert inputStream != null;
       var lines = new String(inputStream.readAllBytes());
@@ -17,53 +18,52 @@ public class Menu {
     }
   }
 
+  public static int getIntInput(String prompt) {
+    var input = getInput(prompt);
+    try {
+      return Integer.parseInt(input);
+    } catch (NumberFormatException e) {
+      System.out.println("Invalid input: " + input);
+      System.out.println("Input has to be a number.");
+      return getIntInput(prompt);
+    }
+  }
+
+  public static String getInput(String prompt) {
+    System.out.print(prompt);
+    return scan.nextLine();
+  }
+
   public static void printMainMenu() {
+    clearConsole();
     printFile("MainMenu.txt");
     System.out.print("Enter your choice: ");
-    try (Scanner scanner = new Scanner(System.in)) {
-      var choice = scanner.nextInt();
-      clearConsole();
-      processInput(choice);
+    try {
+      processInput(Integer.parseInt(scan.nextLine()));
+    }
+    catch (NumberFormatException e) {
+      System.out.println("Input has to be a number.");
+      printMainMenu();
     }
   }
 
   private static void processInput(int input) {
     switch (input) {
-      case 1 -> compare();
-      case 2 -> createDb();
-      case 3 -> checkDb();
-      case 4 -> System.exit(0);
-      default -> {
-        System.out.println("Invalid input!");
-      }
+      case 1 -> Compare.compare();
+      case 2 -> Compare.prepareDb();
+      case 3 -> Compare.checkDb();
+      case 4 -> DatabaseUtil.cleanupDatabase();
+      case 5 -> System.exit(0);
+      default -> System.out.println("Invalid input!");
     }
+    waitForEnterPress();
     printMainMenu();
   }
 
-  private static void createDb() {
-    DatabaseUtil.create();
-    for (var table : DatabaseUtil.getSecMemberTableNames()) {
-      System.out.println("Generating members for table: " + table + "...");
-      // create 10000 entries in each table
-      for (var i = 0; i < 10000; i++) {
-        var username = "user-" + i;
-        DatabaseUtil.createSecurityMember(table, username);
-      }
-      System.out.println("Created 10000 entries in: " + table );
-    }
-  }
-
-  private static void compare() {
-    System.out.println("wait");
-  }
-
-  private static void checkDb() {
-    var tables = DatabaseUtil.getTables();
-    if (!tables.isEmpty()) {
-      System.out.println("Tables: " + tables);
-    } else {
-      System.out.println("No tables found.");
-    }
+  public static void waitForEnterPress() {
+    Scanner s = new Scanner(System.in);
+    System.out.println("\nPress enter to continue...");
+    s.nextLine();
   }
 
   private static void clearConsole() {
