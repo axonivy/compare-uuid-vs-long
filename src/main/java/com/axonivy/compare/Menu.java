@@ -29,8 +29,8 @@ public class Menu {
 
   private static void processInput(int input) {
     switch (input) {
-      case 1 -> createDb();
-      case 2 -> compare();
+      case 1 -> compare();
+      case 2 -> createDb();
       case 3 -> checkDb();
       case 4 -> System.exit(0);
       default -> {
@@ -42,6 +42,15 @@ public class Menu {
 
   private static void createDb() {
     DatabaseUtil.create();
+    for (var table : DatabaseUtil.getSecMemberTableNames()) {
+      System.out.println("Generating members for table: " + table + "...");
+      // create 10000 entries in each table
+      for (var i = 0; i < 10000; i++) {
+        var username = "user-" + i;
+        DatabaseUtil.createSecurityMember(table, username);
+      }
+      System.out.println("Created 10000 entries in: " + table );
+    }
   }
 
   private static void compare() {

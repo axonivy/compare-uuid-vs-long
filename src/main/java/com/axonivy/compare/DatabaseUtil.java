@@ -4,19 +4,85 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 public class DatabaseUtil {
 
   public static void create() {
     if (getTables().isEmpty()) {
-      createTaskTable();
       createSecurityMemberTables();
+      createTaskTable();
     }
   }
 
   private static void createTaskTable() {
-    executeQuery(createTaskTableSqlStatement());
+    try (Connection connection = getConnection()) {
+      Statement statement = connection.createStatement();
+      statement.executeUpdate(createTaskTableSqlStatement());
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
     System.out.println("Task table was created.");
+  }
+
+  private static String createTaskTableSqlStatement() {
+    return "CREATE TABLE IF NOT EXISTS Task ("
+            + "Id BIGINT NOT NULL,"
+            + "Name VARCHAR(255) NOT NULL,"
+            + "UserId BIGINT NOT NULL,"
+            + "UserRawUuid VARCHAR(255) NOT NULL,"
+            + "UserUuid VARCHAR(255) NOT NULL,"
+            + "PRIMARY KEY (Id),"
+            + "FOREIGN KEY (UserId) REFERENCES SecurityMemberLong(Id),"
+            + "FOREIGN KEY (UserRawUuid) REFERENCES SecurityMemberRawUuid(Id),"
+            + "FOREIGN KEY (UserUuid) REFERENCES SecurityMemberUuid(Id)"
+            + ")";
+  }
+
+  public static List<String> getSecMemberTableNames() {
+    return Arrays.asList("SecurityMemberLong", "SecurityMemberUuid", "SecurityMemberRawUuid");
+  }
+
+  public static void createSecurityMemberTables() {
+    try (Connection connection = getConnection()) {
+      Statement statement = connection.createStatement();
+      for (var table : getSecMemberTableNames()) {
+        statement.executeUpdate(createSecurityMemberSqlStatement(table, table.contains("Long")));
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    System.out.println("SecurityMember tables created.");
+  }
+
+  private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
+    return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
+            + "Id " + (bigint ? "BIGINT" : "VARCHAR(255)") + " NOT NULL,"
+            + "Name VARCHAR(255) NOT NULL,"
+            + "PRIMARY KEY (Id)"
+            + ")";
+  }
+
+  public static void createSecurityMember(String tableName, String userName) {
+    var createMemberStatement = "INSERT INTO " + tableName + " (Name) VALUES (?)";
+    if (!tableName.contains("Long")) {
+      createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
+    }
+    try (Connection connection = getConnection()) {
+      PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
+      preparedStatement.setString(1, userName);
+      if (!tableName.contains("Long")) {
+        var uuid = UUID.randomUUID().toString().toUpperCase();
+        if (tableName.contains("RawUuid")) {
+          preparedStatement.setString(2, uuid);
+        } else {
+          preparedStatement.setString(2, "USER-"+uuid);
+        }
+      }
+      preparedStatement.executeUpdate();
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
   }
 
   private static void isConnectionError(Exception e) {
@@ -41,38 +107,6 @@ public class DatabaseUtil {
       throw new RuntimeException(e);
     }
     return tableList;
-  }
-
-  private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
-    return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
-            + "Id " + (bigint ? "BIGINT" : "VARCHAR(255)") + " NOT NULL,"
-            + "Name VARCHAR(255) NOT NULL,"
-            + "PRIMARY KEY (Id)"
-            + ")";
-  }
-
-  private static String createTaskTableSqlStatement() {
-    return "CREATE TABLE IF NOT EXISTS Task ("
-            + "Id BIGINT NOT NULL,"
-            + "Name VARCHAR(255) NOT NULL,"
-            + "UserId BIGINT NOT NULL,"
-            + "UserRawUuid VARCHAR(255) NOT NULL,"
-            + "UserUuid VARCHAR(255) NOT NULL,"
-            + "PRIMARY KEY (Id)"
-            + ")";
-  }
-
-  public static void createSecurityMemberTables() {
-    try (Connection connection = getConnection()) {
-      Statement statement = connection.createStatement();
-      var tablesList = Arrays.asList("SecurityMemberLong", "SecurityMemberUuid", "SecurityMemberRawUuid");
-      for (var table : tablesList) {
-        statement.executeUpdate(createSecurityMemberSqlStatement(table, table.contains("Long")));
-      }
-      System.out.println("SecurityMember tables created.");
-    } catch (SQLException e) {
-      isConnectionError(e);
-    }
   }
 
   public static String read() {
