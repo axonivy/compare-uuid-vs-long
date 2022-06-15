@@ -7,6 +7,9 @@ import java.util.Set;
 
 public class Compare {
 
+  private static final int averageMsForHundredEntries = 1500;
+  private static final int amountOfTables = 4;
+
   public static void main(String[] args) {
     Menu.printMainMenu();
   }
@@ -14,8 +17,20 @@ public class Compare {
   public static void prepareDb() {
     DatabaseUtil.create();
     var amountOfEntries = Menu.getIntInput("How many Database entries do you want to create?: ");
-    generateSecMemberEntries(amountOfEntries);
-    generateTasks(amountOfEntries);
+    var estimatedTime = (amountOfEntries/100) * averageMsForHundredEntries * amountOfTables / 1000;
+    if (amountOfEntries < 1) {
+      System.out.println("Invalid input!");
+      prepareDb();
+    } else if (estimatedTime > 300) {
+        System.out.println("Estimated time to create all data is: " +estimatedTime + "s. Are you sure you want to continue? (y/n)");
+        if (!"y".equals(Menu.getInput())) {
+          prepareDb();
+        }
+        else {
+          generateSecMemberEntries(amountOfEntries);
+          generateTasks(amountOfEntries);
+        }
+    }
   }
 
   private static void generateTasks(int amountOfEntries) {
@@ -53,10 +68,13 @@ public class Compare {
         continue;
       }
       System.out.println("Generating " + amountOfEntries + " members for table: " + table + "...");
+      long startTime = System.nanoTime();
       for (var i = 0; i < amountOfEntries; i++) {
         DatabaseUtil.insertSecurityMemberToDb(table, "USER-" + i);
       }
-      System.out.println("Created " + amountOfEntries + " entries in: " + table + "\n");
+      long elapsedTime = System.nanoTime() - startTime;
+      var seconds = (double) elapsedTime / 1000000000.0;
+      System.out.println("Created " + amountOfEntries + " entries after " + seconds + "s, in: " + table + "\n");
     }
   }
 

@@ -31,6 +31,10 @@ public class Menu {
 
   public static String getInput(String prompt) {
     System.out.print(prompt);
+    return getInput();
+  }
+
+  public static String getInput() {
     return scan.nextLine();
   }
 
