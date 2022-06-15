@@ -49,14 +49,20 @@ public class Compare {
   }
 
   public static void compare() {
+    System.out.println("\nComparing tables...");
     var randomUsers = DatabaseUtil.getRandomUsers();
     var columns = List.of("UserId", "UserUuid", "UserRawUuid");
     for (int i = 0; i < randomUsers.size(); i++) {
-      long startTime = System.nanoTime();
-      var resultSet = DatabaseUtil.findTasks(columns.get(i), randomUsers.get(i));
-      var elapsedTime = System.nanoTime() - startTime;
-      var seconds = (double) elapsedTime / 1000000000.0;
-      System.out.println("Column: " + columns.get(i) + " | Time: " + seconds + "s" + " | User: " + randomUsers.get(i));
+      var queryTimes = new ArrayList<Long>();
+      for (int j = 0; j < 1000; j++) {
+        long startTime = System.nanoTime();
+        DatabaseUtil.findTasks(columns.get(i), randomUsers.get(i));
+        var elapsedTime = System.nanoTime() - startTime;
+        queryTimes.add(elapsedTime);
+      }
+      var averageQueryTime = queryTimes.stream().mapToLong(Long::longValue).average().getAsDouble();
+      var milliseconds = averageQueryTime / 1000000.0;
+      System.out.println("Column: " + columns.get(i) + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
     }
   }
 
