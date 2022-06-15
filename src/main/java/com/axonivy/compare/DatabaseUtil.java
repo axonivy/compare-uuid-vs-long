@@ -63,40 +63,61 @@ public class DatabaseUtil {
             + ")";
   }
 
-  public static void insertSecurityMemberToDb(String tableName, String userName) {
+  public static void massInsertSecurityMembersToDb(String tableName, int count) {
     var createMemberStatement = "INSERT INTO " + tableName + " (Name) VALUES (?)";
     if (!tableName.contains("Long")) {
       createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
     }
     try (Connection connection = getConnection()) {
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
-      preparedStatement.setString(1, userName);
-      if (!tableName.contains("Long")) {
-        var uuid = UUID.randomUUID().toString().toUpperCase();
-        if (tableName.contains("RawUuid")) {
-          preparedStatement.setString(2, uuid);
-        } else {
-          preparedStatement.setString(2, "USER-"+uuid);
+      for (var i = 0; i < count; i++) {
+        preparedStatement.setString(1, "user" + i);
+        if (!tableName.contains("Long")) {
+          var uuid = UUID.randomUUID().toString().toUpperCase();
+          if (tableName.contains("RawUuid")) {
+            preparedStatement.setString(2, uuid);
+          } else {
+            preparedStatement.setString(2, "USER-"+uuid);
+          }
         }
+        preparedStatement.addBatch();
       }
-      preparedStatement.executeUpdate();
+      preparedStatement.executeBatch();
     } catch (SQLException e) {
       isConnectionError(e);
     }
   }
 
-  public static void insertTaskToDb(String taskName, List<String> userIds) {
+  public static void massInsertTaskToDb(int count) {
     var createMemberStatement = "INSERT INTO Task (Name, UserId, UserUuid, UserRawUuid) VALUES (?, ?, ?, ?)";
     try (Connection connection = getConnection()) {
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
-      preparedStatement.setString(1, taskName);
-      preparedStatement.setInt(2, Integer.parseInt(userIds.get(0)));
-      preparedStatement.setString(3, userIds.get(1));
-      preparedStatement.setString(4, userIds.get(2));
-      preparedStatement.executeUpdate();
+      int lastUsers = 0;
+      var currentUsersSet = getRandomUsers();
+      for (var i = 0; i < count; i++) {
+        if (i / 100 > lastUsers) {
+          currentUsersSet = getRandomUsers();
+          lastUsers += 1;
+        }
+        preparedStatement.setString(1, "Task-" + i);
+        preparedStatement.setInt(2, Integer.parseInt(currentUsersSet.get(0)));
+        preparedStatement.setString(3, currentUsersSet.get(1));
+        preparedStatement.setString(4, currentUsersSet.get(2));
+        preparedStatement.addBatch();
+      }
+      preparedStatement.executeBatch();
     } catch (SQLException e) {
       isConnectionError(e);
     }
+  }
+
+  public static List<String> getRandomUsers() {
+    var randomUsers = new ArrayList<String>();
+    for (var table : DatabaseUtil.getSecMemberTableNames()) {
+      var randomUser = DatabaseUtil.getRandomUser(table);
+      randomUsers.add(randomUser);
+    }
+    return randomUsers;
   }
 
   public static boolean entriesAlreadyExist(String tableName) {
@@ -158,23 +179,20 @@ public class DatabaseUtil {
     return null;
   }
 
-  public static String findTasks(String columnName, String value) {
-    StringBuilder sb = new StringBuilder();
+  public static ResultSet findTasks(String columnName, String value) {
+    PreparedStatement statement;
     try (Connection connection = getConnection()) {
-      var statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
+      statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
       if (columnName.equals("UserId")) {
         statement.setInt(1, Integer.parseInt(value));
       } else {
         statement.setString(1, value);
       }
-      var resultSet = statement.executeQuery();
-      while (resultSet.next()) {
-        sb.append(resultSet.getString("Id")).append(" ").append(resultSet.getString("Name")).append(" ").append(resultSet.getString("UserId")).append(" ").append(resultSet.getString("UserUuid")).append(" ").append(resultSet.getString("UserRawUuid")).append("\n");
-      }
+      return statement.executeQuery();
     } catch (Exception e) {
       isConnectionError(e);
     }
-    return sb.toString();
+    return null;
   }
 
   public static void cleanupDatabase() {
