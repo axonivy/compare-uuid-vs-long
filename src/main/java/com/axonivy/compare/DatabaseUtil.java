@@ -9,8 +9,7 @@ public class DatabaseUtil {
     if (getTablesFromDb().isEmpty()) {
       createSecurityMemberTables();
       createTaskTable();
-    }
-    else {
+    } else {
       System.out.println("Tables already exist.");
     }
   }
@@ -77,7 +76,7 @@ public class DatabaseUtil {
           if (tableName.contains("RawUuid")) {
             preparedStatement.setString(2, uuid);
           } else {
-            preparedStatement.setString(2, "USER-"+uuid);
+            preparedStatement.setString(2, "USER-" + uuid);
           }
         }
         preparedStatement.addBatch();
@@ -109,6 +108,45 @@ public class DatabaseUtil {
     } catch (SQLException e) {
       isConnectionError(e);
     }
+  }
+
+  public static ResultSet findTasks(String columnName, String value) {
+    PreparedStatement statement;
+    try (Connection connection = getConnection()) {
+      statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
+      if (columnName.equals("UserId")) {
+        statement.setInt(1, Integer.parseInt(value));
+      } else {
+        statement.setString(1, value);
+      }
+      return statement.executeQuery();
+    } catch (Exception e) {
+      isConnectionError(e);
+    }
+    return null;
+  }
+
+  public static double measureFindingTasks(String columnName, String user) {
+    var queryTimes = new ArrayList<Long>();
+    PreparedStatement statement;
+    try (Connection connection = getConnection()) {
+      statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
+      if (columnName.equals("UserId")) {
+        statement.setInt(1, Integer.parseInt(user));
+      } else {
+        statement.setString(1, user);
+      }
+      for (int j = 0; j < 1000; j++) {
+        long startTime = System.nanoTime();
+        statement.executeQuery();
+        var elapsedTime = System.nanoTime() - startTime;
+        queryTimes.add(elapsedTime);
+      }
+    } catch (Exception e) {
+      isConnectionError(e);
+    }
+    var averageQueryTime = queryTimes.stream().mapToLong(Long::longValue).average().getAsDouble();
+    return averageQueryTime / 1000000.0; // convert to ms
   }
 
   public static List<String> getRandomUsers() {
@@ -175,22 +213,6 @@ public class DatabaseUtil {
       }
     } catch (SQLException e) {
       throw new RuntimeException(e);
-    }
-    return null;
-  }
-
-  public static ResultSet findTasks(String columnName, String value) {
-    PreparedStatement statement;
-    try (Connection connection = getConnection()) {
-      statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
-      if (columnName.equals("UserId")) {
-        statement.setInt(1, Integer.parseInt(value));
-      } else {
-        statement.setString(1, value);
-      }
-      return statement.executeQuery();
-    } catch (Exception e) {
-      isConnectionError(e);
     }
     return null;
   }
