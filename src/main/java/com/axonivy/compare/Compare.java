@@ -1,7 +1,5 @@
 package com.axonivy.compare;
 
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 public class Compare {
@@ -21,17 +19,25 @@ public class Compare {
     generateTasks(amountOfEntries);
   }
 
-  private static void generateTasks(int amountOfEntries) {
+  private static void generateTasks(int entries) {
+    DatabaseUtil.getDatabases().forEach(db -> generateTasks(db, entries));
+  }
+
+  private static void generateTasks(Database db, int amountOfEntries) {
     if (DatabaseUtil.entriesAlreadyExist("Task", amountOfEntries)) {
       System.out.println("Entries already exist in table: " + "Task");
       return;
     }
     System.out.println("\nGenerating " + amountOfEntries + " entries in table: Task");
-    DatabaseUtil.massInsertTaskToDb(amountOfEntries);
+    DatabaseUtil.massInsertTaskToDb(db, amountOfEntries);
     System.out.println("Created " + amountOfEntries + " tasks\n");
   }
 
-  private static void generateSecMemberEntries(int amountOfEntries) {
+  private static void generateSecMemberEntries(int entries) {
+    DatabaseUtil.getDatabases().forEach(db -> generateSecMemberEntries(db, entries));
+  }
+
+  private static void generateSecMemberEntries(Database db, int amountOfEntries) {
     var tableIndex = 0;
     var secMemberTables = DatabaseUtil.getSecMemberTableNames();
     for (var table : secMemberTables) {
@@ -39,27 +45,42 @@ public class Compare {
         System.out.println("Entries already exist in table: " + table);
         continue;
       }
-      System.out.println("\nGenerating " + amountOfEntries + " members for table: " + table + "... (" + ++tableIndex + "/" + secMemberTables.size() + ")");
+      System.out.println("\nGenerating " + amountOfEntries + " members for table: " + table + "... (" + tableIndex + "/" + secMemberTables.size() + ")");
       long startTime = System.nanoTime();
-      DatabaseUtil.massInsertSecurityMembersToDb(table, amountOfEntries);
+      DatabaseUtil.massInsertSecurityMembersToDb(db, table, amountOfEntries);
       long elapsedTime = System.nanoTime() - startTime;
       var prettyTime = prettyTime(elapsedTime / 1000000);
       System.out.println("Created " + amountOfEntries + " entries after " + prettyTime + " in table: " + table);
     }
   }
 
-  public static void compare() {
+  public static void compareAllDbs() {
+    var databases = DatabaseUtil.getDatabases();
+    for (var database : databases) {
+      compare(database);
+    }
+  }
+
+  public static void compare(Database db) {
+    if (db == null) {
+      System.out.println("Database is null!");
+      return;
+    }
     System.out.println("\nComparing tables...");
-    var randomUsers = DatabaseUtil.getRandomUsers();
+    var randomUsers = DatabaseUtil.getRandomUsers(db);
     var columns = List.of("UserId", "UserUuid", "UserRawUuid");
     for (int i = 0; i < randomUsers.size(); i++) {
-      var milliseconds = DatabaseUtil.measureFindingTasks(columns.get(i), randomUsers.get(i));
+      var milliseconds = DatabaseUtil.measureFindingTasks(db, columns.get(i), randomUsers.get(i));
       System.out.println("Column: " + columns.get(i) + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
     }
   }
 
   public static void checkDb() {
-    var tables = DatabaseUtil.getTablesFromDb();
+    DatabaseUtil.getDatabases().forEach(Compare::checkDb);
+  }
+
+  public static void checkDb(Database db) {
+    var tables = DatabaseUtil.getTablesFromDb(db);
     if (!tables.isEmpty()) {
       System.out.println("Tables: " + tables);
     } else {

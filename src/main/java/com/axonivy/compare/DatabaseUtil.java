@@ -5,17 +5,56 @@ import java.util.*;
 
 public class DatabaseUtil {
 
+  private static final List<Database> databases = createDatabases();
+
+  private static List<Database> createDatabases() {
+    var databases = new ArrayList<Database>();
+    var defaultPassword = "nimda";
+    databases.add(new Database("postgresql", "5432", "postgres", defaultPassword));
+    databases.add(new Database("oracle", "1521", "SYSTEM", defaultPassword));
+    databases.add(new Database("mariadb", "3010", "root", defaultPassword));
+    databases.add(new Database("mysql", "3306", "root", defaultPassword));
+    databases.add(new Database("mssql", "1433", "sa", "secure1234PASSWORD!"));
+    return databases;
+  }
+
+  public static List<Database> getDatabases() {
+    return databases;
+  }
+
   public static void create() {
-    if (getTablesFromDb().isEmpty()) {
-      createSecurityMemberTables();
-      createTaskTable();
-    } else {
-      System.out.println("Tables already exist.");
+    for (var database : databases) {
+      if (getTablesFromDb(database).isEmpty()) {
+        createSecurityMemberTables(database);
+        createTaskTable(database);
+      } else {
+        System.out.println("Tables already exist.");
+      }
     }
   }
 
-  private static void createTaskTable() {
-    try (Connection connection = getConnection()) {
+  public static void createSecurityMemberTables(Database db) {
+    try (Connection connection = getConnection(db)) {
+      Statement statement = connection.createStatement();
+      for (var table : getSecMemberTableNames()) {
+        statement.executeUpdate(createSecurityMemberSqlStatement(table, table.contains("Long")));
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    System.out.println("SecurityMember tables created.");
+  }
+
+  private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
+    return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
+            + "Id " + (bigint ? "SERIAL" : "VARCHAR(255) NOT NULL") + ","
+            + "Name VARCHAR(255) NOT NULL,"
+            + "PRIMARY KEY (Id)"
+            + ")";
+  }
+
+  private static void createTaskTable(Database db) {
+    try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       statement.executeUpdate(createTaskTableSqlStatement());
     } catch (SQLException e) {
@@ -42,32 +81,12 @@ public class DatabaseUtil {
     return Arrays.asList("SecurityMemberLong", "SecurityMemberUuid", "SecurityMemberRawUuid");
   }
 
-  public static void createSecurityMemberTables() {
-    try (Connection connection = getConnection()) {
-      Statement statement = connection.createStatement();
-      for (var table : getSecMemberTableNames()) {
-        statement.executeUpdate(createSecurityMemberSqlStatement(table, table.contains("Long")));
-      }
-    } catch (SQLException e) {
-      isConnectionError(e);
-    }
-    System.out.println("SecurityMember tables created.");
-  }
-
-  private static String createSecurityMemberSqlStatement(String tableName, boolean bigint) {
-    return "CREATE TABLE IF NOT EXISTS " + tableName + " ("
-            + "Id " + (bigint ? "SERIAL" : "VARCHAR(255) NOT NULL") + ","
-            + "Name VARCHAR(255) NOT NULL,"
-            + "PRIMARY KEY (Id)"
-            + ")";
-  }
-
-  public static void massInsertSecurityMembersToDb(String tableName, int count) {
+  public static void massInsertSecurityMembersToDb(Database db, String tableName, int count) {
     var createMemberStatement = "INSERT INTO " + tableName + " (Name) VALUES (?)";
     if (!tableName.contains("Long")) {
       createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
     }
-    try (Connection connection = getConnection()) {
+    try (Connection connection = getConnection(db)) {
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
       for (var i = 0; i < count; i++) {
         preparedStatement.setString(1, "user" + i);
@@ -87,15 +106,15 @@ public class DatabaseUtil {
     }
   }
 
-  public static void massInsertTaskToDb(int count) {
+  public static void massInsertTaskToDb(Database db, int count) {
     var createMemberStatement = "INSERT INTO Task (Name, UserId, UserUuid, UserRawUuid) VALUES (?, ?, ?, ?)";
-    try (Connection connection = getConnection()) {
+    try (Connection connection = getConnection(db)) {
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
       int lastUsers = 0;
-      var currentUsersSet = getRandomUsers();
+      var currentUsersSet = getRandomUsers(db);
       for (var i = 0; i < count; i++) {
         if (i / 100 > lastUsers) {
-          currentUsersSet = getRandomUsers();
+          currentUsersSet = getRandomUsers(db);
           lastUsers += 1;
         }
         preparedStatement.setString(1, "Task-" + i);
@@ -110,26 +129,10 @@ public class DatabaseUtil {
     }
   }
 
-  public static ResultSet findTasks(String columnName, String value) {
-    PreparedStatement statement;
-    try (Connection connection = getConnection()) {
-      statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
-      if (columnName.equals("UserId")) {
-        statement.setInt(1, Integer.parseInt(value));
-      } else {
-        statement.setString(1, value);
-      }
-      return statement.executeQuery();
-    } catch (Exception e) {
-      isConnectionError(e);
-    }
-    return null;
-  }
-
-  public static double measureFindingTasks(String columnName, String user) {
+  public static double measureFindingTasks(Database db, String columnName, String user) {
     var queryTimes = new ArrayList<Long>();
     PreparedStatement statement;
-    try (Connection connection = getConnection()) {
+    try (Connection connection = getConnection(db)) {
       statement = connection.prepareStatement("SELECT * FROM Task WHERE " + columnName + " = ?");
       if (columnName.equals("UserId")) {
         statement.setInt(1, Integer.parseInt(user));
@@ -149,25 +152,26 @@ public class DatabaseUtil {
     return averageQueryTime / 1000000.0; // convert to ms
   }
 
-  public static List<String> getRandomUsers() {
+  public static List<String> getRandomUsers(Database db) {
     var randomUsers = new ArrayList<String>();
     for (var table : DatabaseUtil.getSecMemberTableNames()) {
-      var randomUser = DatabaseUtil.getRandomUser(table);
+      var randomUser = DatabaseUtil.getRandomUser(db, table);
       randomUsers.add(randomUser);
     }
     return randomUsers;
   }
 
-  public static boolean entriesAlreadyExist(String tableName) {
-    return entriesAlreadyExist(tableName, 1);
+
+  public static boolean entriesAlreadyExist(String tableName, int entries) {
+    return getDatabases().stream().allMatch(db -> entriesAlreadyExist(db, tableName, entries));
   }
 
-  public static boolean entriesAlreadyExist(String tableName, int amountOfEntries) {
-    var tables = getTablesFromDb();
+  public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
+    var tables = getTablesFromDb(db);
     if (tables.isEmpty()) {
       return false;
     }
-    try (Connection connection = getConnection()) {
+    try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
       if (resultSet.next()) {
@@ -188,9 +192,9 @@ public class DatabaseUtil {
     System.out.println(e.getMessage());
   }
 
-  public static List<String> getTablesFromDb() {
+  public static List<String> getTablesFromDb(Database db) {
     var tableList = new ArrayList<String>();
-    try (Connection connection = getConnection()) {
+    try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       // query only tables created by a user
       var query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA not in ('information_schema', 'pg_catalog')";
@@ -204,8 +208,8 @@ public class DatabaseUtil {
     return tableList;
   }
 
-  public static String getRandomUser(String tableName) {
-    try (Connection connection = getConnection()) {
+  public static String getRandomUser(Database db, String tableName) {
+    try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       var resultSet = statement.executeQuery("SELECT Id FROM " + tableName + " ORDER BY RANDOM() LIMIT 1");
       if (resultSet.next()) {
@@ -218,7 +222,11 @@ public class DatabaseUtil {
   }
 
   public static void cleanupDatabase() {
-    try (Connection connection = getConnection()) {
+    getDatabases().forEach(DatabaseUtil::cleanupDatabase);
+  }
+
+  public static void cleanupDatabase(Database db) {
+    try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       statement.executeUpdate("DROP TABLE IF EXISTS Task");
       for (var table : getSecMemberTableNames()) {
@@ -230,7 +238,7 @@ public class DatabaseUtil {
     System.out.println("Database cleaned up.");
   }
 
-  private static Connection getConnection() throws SQLException {
-    return DriverManager.getConnection("jdbc:postgresql://localhost:5432/postgres", "postgres", "nimda");
+  private static Connection getConnection(Database db) throws SQLException {
+    return DriverManager.getConnection("jdbc:"+db.name()+"://localhost:"+db.port()+"/"+db.user(), db.user(), db.password());
   }
 }
