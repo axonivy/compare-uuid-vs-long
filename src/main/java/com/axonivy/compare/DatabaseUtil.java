@@ -10,11 +10,11 @@ public class DatabaseUtil {
   private static List<Database> createDatabases() {
     var databases = new ArrayList<Database>();
     var defaultPassword = "nimda";
-    databases.add(new Database("postgresql", "5432", "postgres", defaultPassword));
-    databases.add(new Database("oracle", "1521", "SYSTEM", defaultPassword));
-    databases.add(new Database("mariadb", "3010", "root", defaultPassword));
-    databases.add(new Database("mysql", "3306", "root", defaultPassword));
-    databases.add(new Database("mssql", "1433", "sa", "secure1234PASSWORD!"));
+    databases.add(new Database("postgresql", "jdbc:postgresql://localhost:5432/postgres", "postgres", defaultPassword));
+//    databases.add(new Database("oracle", "jdbc:oracle:thin:@localhost:1521:oracle", "SYSTEM", defaultPassword));
+    databases.add(new Database("mariadb", "jdbc:mariadb://localhost:3010/", "root", defaultPassword));
+    databases.add(new Database("mysql", "jdbc:mysql://localhost:3306/mysql", "root", defaultPassword));
+    databases.add(new Database("mssql", "jdbc:sqlserver://localhost:1433;encrypt=false", "sa", "secure1234PASSWORD!"));
     return databases;
   }
 
@@ -239,6 +239,6 @@ public class DatabaseUtil {
   }
 
   private static Connection getConnection(Database db) throws SQLException {
-    return DriverManager.getConnection("jdbc:"+db.name()+"://localhost:"+db.port()+"/"+db.user(), db.user(), db.password());
+    return DriverManager.getConnection(db.url(), db.user(), db.password());
   }
 }
