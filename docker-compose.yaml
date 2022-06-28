@@ -37,7 +37,6 @@ services:
       MYSQL_ROOT_PASSWORD: nimda
 
 
-
   mariadb10db:
     image: mariadb:10
     ports:
@@ -62,7 +61,8 @@ services:
     environment:
       ACCEPT_EULA: Y
       SA_PASSWORD: secure1234PASSWORD!
-      
+
+
   oracle19c:
     image: docker-registry.ivyteam.io/oracle/database-orapdb:19.3.0-se2
     ports:

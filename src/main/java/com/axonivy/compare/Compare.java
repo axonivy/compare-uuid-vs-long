@@ -1,5 +1,7 @@
 package com.axonivy.compare;
 
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.List;
 
 public class Compare {
@@ -28,7 +30,7 @@ public class Compare {
       System.out.println("Entries already exist in table: " + "Task");
       return;
     }
-    System.out.println("\nGenerating " + amountOfEntries + " entries in table: Task");
+    System.out.println("\nGenerating " + amountOfEntries + " entries in table: Task, " + db.type());
     DatabaseUtil.massInsertTaskToDb(db, amountOfEntries);
     System.out.println("Created " + amountOfEntries + " tasks\n");
   }
@@ -38,19 +40,20 @@ public class Compare {
   }
 
   private static void generateSecMemberEntries(Database db, int amountOfEntries) {
-    var tableIndex = 0;
+    var tableIndex = 1;
     var secMemberTables = DatabaseUtil.getSecMemberTableNames();
     for (var table : secMemberTables) {
       if (DatabaseUtil.entriesAlreadyExist(table, amountOfEntries)) {
         System.out.println("Entries already exist in table: " + table);
         continue;
       }
-      System.out.println("\nGenerating " + amountOfEntries + " members for table: " + table + "... (" + tableIndex + "/" + secMemberTables.size() + ")");
+      System.out.println("\nGenerating " + amountOfEntries + " members for table: " + table + "... ("+db.type()+" " + tableIndex + "/" + secMemberTables.size() + ")");
       long startTime = System.nanoTime();
       DatabaseUtil.massInsertSecurityMembersToDb(db, table, amountOfEntries);
       long elapsedTime = System.nanoTime() - startTime;
       var prettyTime = prettyTime(elapsedTime / 1000000);
       System.out.println("Created " + amountOfEntries + " entries after " + prettyTime + " in table: " + table);
+      tableIndex++;
     }
   }
 
@@ -63,15 +66,17 @@ public class Compare {
 
   public static void compare(Database db) {
     if (db == null) {
-      System.out.println("Database is null!");
-      return;
-    }
-    System.out.println("\nComparing tables...");
-    var randomUsers = DatabaseUtil.getRandomUsers(db);
-    var columns = List.of("UserId", "UserUuid", "UserRawUuid");
-    for (int i = 0; i < randomUsers.size(); i++) {
-      var milliseconds = DatabaseUtil.measureFindingTasks(db, columns.get(i), randomUsers.get(i));
-      System.out.println("Column: " + columns.get(i) + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
+      compareAllDbs();
+    } else {
+      DecimalFormat df = new DecimalFormat("#.####");
+      df.setRoundingMode(RoundingMode.CEILING);
+      System.out.println("\nComparing tables in " + db.type() + " ...");
+      var randomUsers = DatabaseUtil.getRandomUsers(db);
+      var columns = List.of("UserId", "UserUuid", "UserRawUuid");
+      for (int i = 0; i < randomUsers.size(); i++) {
+        var milliseconds = df.format(DatabaseUtil.measureFindingTasks(db, columns.get(i), randomUsers.get(i)));
+        System.out.println("Column: " + columns.get(i) + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
+      }
     }
   }
 

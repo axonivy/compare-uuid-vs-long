@@ -1,3 +1,3 @@
 package com.axonivy.compare;
 
-public record Database(String name, String url, String user, String password) {}
+public record Database(String type, String url, String databaseName, String user, String password) {}
