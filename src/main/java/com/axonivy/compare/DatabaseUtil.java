@@ -168,12 +168,10 @@ public class DatabaseUtil {
       if (db.type().equals("sqlserver"))
         connection.setAutoCommit(false);
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
-      int lastUsers = 0;
       var currentUsersSet = getRandomUsers(db);
       for (var i = 0; i < count; i++) {
-        if (i / 100 > lastUsers) {
+        if ((i % 100) == 0) {
           currentUsersSet = getRandomUsers(db);
-          lastUsers += 1;
         }
         preparedStatement.setString(1, "Task-" + i);
         preparedStatement.setInt(2, Integer.parseInt(currentUsersSet.get(0)));
@@ -206,8 +204,11 @@ public class DatabaseUtil {
     } catch (Exception e) {
       isConnectionError(e);
     }
-    var averageQueryTime = queryTimes.stream().mapToLong(Long::longValue).average().getAsDouble();
-    return averageQueryTime / 1000000.0; // convert to ms
+    var averageQueryTime = queryTimes.stream().mapToLong(Long::longValue).average();
+    if (averageQueryTime.isEmpty()) {
+      return 0;
+    }
+    return averageQueryTime.getAsDouble() / 1000000.0; // convert to ms
   }
 
   public static List<String> getRandomUsers(Database db) {
@@ -219,23 +220,23 @@ public class DatabaseUtil {
   }
 
 
-  public static boolean entriesAlreadyExist(String tableName, int entries) {
-    return getDatabases().stream().allMatch(db -> entriesAlreadyExist(db, tableName, entries));
-  }
-
-  public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
-    try (Connection connection = getConnection(db)) {
-      Statement statement = connection.createStatement();
-      var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
-      if (resultSet.next()) {
-        var count = resultSet.getInt(1);
-        return count >= amountOfEntries;
-      }
-    } catch (SQLException e) {
-      isConnectionError(e);
-    }
-    return false;
-  }
+//  public static boolean entriesAlreadyExist(String tableName, int entries) {
+//    return getDatabases().stream().allMatch(db -> entriesAlreadyExist(db, tableName, entries));
+//  }
+//
+//  public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
+//    try (Connection connection = getConnection(db)) {
+//      Statement statement = connection.createStatement();
+//      var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
+//      if (resultSet.next()) {
+//        var count = resultSet.getInt(1);
+//        return count >= amountOfEntries;
+//      }
+//    } catch (SQLException e) {
+//      isConnectionError(e);
+//    }
+//    return false;
+//  }
 
   private static void isConnectionError(Exception e) {
     var errorStrings = Arrays.asList("connection", "refused");
