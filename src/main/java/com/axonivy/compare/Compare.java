@@ -75,7 +75,8 @@ public class Compare {
       var columns = List.of("UserId", "UserUuid", "UserRawUuid");
       for (int i = 0; i < randomUsers.size(); i++) {
         var milliseconds = df.format(DatabaseUtil.measureFindingTasks(db, columns.get(i), randomUsers.get(i)));
-        System.out.println("Column: " + columns.get(i) + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
+        String column = String.format("%12s", columns.get(i));
+        System.out.println("Column: " + column + " | Average query time: " + milliseconds + "ms" + " | User: " + randomUsers.get(i));
       }
     }
   }

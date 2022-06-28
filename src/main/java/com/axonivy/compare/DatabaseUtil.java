@@ -141,6 +141,8 @@ public class DatabaseUtil {
       createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
     }
     try (Connection connection = getConnection(db)) {
+      if (db.type().equals("sqlserver"))
+        connection.setAutoCommit(false);
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
       for (var i = 0; i < count; i++) {
         preparedStatement.setString(1, "user" + i);
@@ -163,6 +165,8 @@ public class DatabaseUtil {
   public static void massInsertTaskToDb(Database db, int count) {
     var createMemberStatement = "INSERT INTO Task (Name, UserId, UserUuid, UserRawUuid) VALUES (?, ?, ?, ?)";
     try (Connection connection = getConnection(db)) {
+      if (db.type().equals("sqlserver"))
+        connection.setAutoCommit(false);
       PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
       int lastUsers = 0;
       var currentUsersSet = getRandomUsers(db);
@@ -220,10 +224,6 @@ public class DatabaseUtil {
   }
 
   public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
-//    var tables = getTablesFromDb(db);
-//    if (tables.isEmpty()) {
-//      return false;
-//    }
     try (Connection connection = getConnection(db)) {
       Statement statement = connection.createStatement();
       var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
@@ -269,7 +269,7 @@ public class DatabaseUtil {
         randomFunction = "RANDOM()";
       var sql = "SELECT Id FROM " + tableName + " ORDER BY " + randomFunction + " LIMIT 1";
       if (db.type().equals("sqlserver"))
-        sql = "SELECT TOP 1 Id FROM " + tableName + " ORDER BY " + randomFunction;
+        sql = "SELECT TOP 1 Id FROM " + tableName + " ORDER BY NEWID()";
       var resultSet = statement.executeQuery(sql);
       if (resultSet.next()) {
         return resultSet.getString(1);
@@ -300,6 +300,8 @@ public class DatabaseUtil {
   private static Connection getConnection(Database db) throws SQLException {
     if (db.type().equals("sqlserver"))
       return DriverManager.getConnection(db.url()+";databaseName="+db.databaseName(), db.user(), db.password());
+    if (db.type().equals("mysql"))
+      return DriverManager.getConnection(db.url()+db.databaseName()+"?rewriteBatchedStatements=true", db.user(), db.password());
     return DriverManager.getConnection(db.url()+db.databaseName(), db.user(), db.password());
   }
 
