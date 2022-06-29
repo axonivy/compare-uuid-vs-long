@@ -53,11 +53,11 @@ public class Menu {
 
   private static void processInput(int input) {
     switch (input) {
-      case 1 -> Compare.compare();
+      case 1 -> Compare.compare(null);
       case 2 -> Compare.prepareDb();
-      case 3 -> Compare.checkDb();
-      case 4 -> DatabaseUtil.cleanupDatabase();
-      case 5 -> System.exit(0);
+//      case 3 -> Compare.checkDb();
+      case 3 -> DatabaseUtil.cleanupDatabase();
+      case 4 -> System.exit(0);
       default -> System.out.println("Invalid input!");
     }
     waitForEnterPress();
