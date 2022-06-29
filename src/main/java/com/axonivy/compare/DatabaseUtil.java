@@ -157,6 +157,8 @@ public class DatabaseUtil {
         preparedStatement.addBatch();
       }
       preparedStatement.executeBatch();
+      if (db.type().equals("sqlserver"))
+        connection.commit();
     } catch (SQLException e) {
       isConnectionError(e);
     }
@@ -180,6 +182,8 @@ public class DatabaseUtil {
         preparedStatement.addBatch();
       }
       preparedStatement.executeBatch();
+      if (db.type().equals("sqlserver"))
+        connection.commit();
     } catch (SQLException e) {
       isConnectionError(e);
     }
