@@ -30,10 +30,13 @@ The query times are measured and added to a list and an average is calculated at
 
 # Results
 
-After running comparing 5 times the average times where:
+There might be something wrong with the database connections or how the different statements are executed
+as im neither a JDBC nor Databases expert.
 
-| Table   | 1     | 2     | 3     | 4     | 5     | Average |
-|---------|-------|-------|-------|-------|-------|---------|
-| Long    | 5,679 | 6,354 | 5,990 | 5,613 | 5,725 | 5,872   |
-| Uuid    | 7,134 | 7,877 | 7,255 | 7,098 | 7,069 | 7,287   |
-| RawUuid | 7,164 | 7,078 | 6,768 | 7,209 | 6,759 | 6,996   |
+Results on a database size of 1'000'000 rows (users of each type and tasks) on i7-8700k
+
+|                  | PostgreSQL | MariaDB | MySQL   | MsSQL  |
+|------------------|------------|---------|---------|--------|
+| ID (Long)        | 26.043     |  0.0868 | 213.059 | 8.122  |
+| UUID with prefix | 31.385     |  0.0893 | 271.873 | 19.565 |
+| Raw UUID         | 29.947     |  0.0851 | 239.921 | 18.077 |

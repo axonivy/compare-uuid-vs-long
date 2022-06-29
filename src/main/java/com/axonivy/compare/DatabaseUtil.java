@@ -166,26 +166,34 @@ public class DatabaseUtil {
 
   public static void massInsertTaskToDb(Database db, int count) {
     var createMemberStatement = "INSERT INTO Task (Name, UserId, UserUuid, UserRawUuid) VALUES (?, ?, ?, ?)";
-    try (Connection connection = getConnection(db)) {
-      if (db.type().equals("sqlserver"))
-        connection.setAutoCommit(false);
-      PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
-      var currentUsersSet = getRandomUsers(db);
-      for (var i = 0; i < count; i++) {
-        if ((i % 100) == 0) {
-          currentUsersSet = getRandomUsers(db);
+    if (!entriesAlreadyExist(db, "Task", count)) {
+      try (Connection connection = getConnection(db)) {
+        if (db.type().equals("sqlserver"))
+          connection.setAutoCommit(false);
+        PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement);
+        var currentUsersSet = getRandomUsers(db);
+        for (var i = 0; i < count; i++) {
+          if ((i % 1000) == 0) {
+            currentUsersSet = getRandomUsers(db);
+            if (i % (count/10) == 0) {
+              System.out.println("Prepared " + i + " tasks.");
+            }
+          }
+          preparedStatement.setString(1, "Task-" + i);
+          preparedStatement.setInt(2, Integer.parseInt(currentUsersSet.get(0)));
+          preparedStatement.setString(3, currentUsersSet.get(1));
+          preparedStatement.setString(4, currentUsersSet.get(2));
+          preparedStatement.addBatch();
         }
-        preparedStatement.setString(1, "Task-" + i);
-        preparedStatement.setInt(2, Integer.parseInt(currentUsersSet.get(0)));
-        preparedStatement.setString(3, currentUsersSet.get(1));
-        preparedStatement.setString(4, currentUsersSet.get(2));
-        preparedStatement.addBatch();
+        System.out.println("Executing batch insert to Database...");
+        preparedStatement.executeBatch();
+        if (db.type().equals("sqlserver"))
+          connection.commit();
+      } catch (SQLException e) {
+        isConnectionError(e);
       }
-      preparedStatement.executeBatch();
-      if (db.type().equals("sqlserver"))
-        connection.commit();
-    } catch (SQLException e) {
-      isConnectionError(e);
+    } else {
+      System.out.println("Entries already exist in " + db.type() + " Task table.");
     }
   }
 
@@ -228,19 +236,19 @@ public class DatabaseUtil {
 //    return getDatabases().stream().allMatch(db -> entriesAlreadyExist(db, tableName, entries));
 //  }
 //
-//  public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
-//    try (Connection connection = getConnection(db)) {
-//      Statement statement = connection.createStatement();
-//      var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
-//      if (resultSet.next()) {
-//        var count = resultSet.getInt(1);
-//        return count >= amountOfEntries;
-//      }
-//    } catch (SQLException e) {
-//      isConnectionError(e);
-//    }
-//    return false;
-//  }
+  public static boolean entriesAlreadyExist(Database db, String tableName, int amountOfEntries) {
+    try (Connection connection = getConnection(db)) {
+      Statement statement = connection.createStatement();
+      var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
+      if (resultSet.next()) {
+        var count = resultSet.getInt(1);
+        return count >= amountOfEntries;
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    return false;
+  }
 
   private static void isConnectionError(Exception e) {
     var errorStrings = Arrays.asList("connection", "refused");
