@@ -44,8 +44,7 @@ public class Menu {
     System.out.print("Enter your choice: ");
     try {
       processInput(Integer.parseInt(scan.nextLine()));
-    }
-    catch (NumberFormatException e) {
+    } catch (NumberFormatException e) {
       System.out.println("Input has to be a number.");
       printMainMenu();
     }
@@ -55,8 +54,7 @@ public class Menu {
     switch (input) {
       case 1 -> Compare.compare(null);
       case 2 -> Compare.prepareDb();
-//      case 3 -> Compare.checkDb();
-      case 3 -> DatabaseUtil.cleanupDatabase();
+      case 3 -> DatabaseCreateUtil.cleanupDatabase();
       case 4 -> System.exit(0);
       default -> System.out.println("Invalid input!");
     }
