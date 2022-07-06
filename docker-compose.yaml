@@ -3,7 +3,7 @@ version: "3.3"
 services:
 
   postgres14db:
-    image: postgres:14
+    build: db-configs/postgres
     ports:
       - 5432:5432
     environment:
@@ -20,7 +20,7 @@ services:
 
 
   mysql8db:
-    image: mysql:8
+    build: db-configs/mysql
     command: --default-authentication-plugin=mysql_native_password
     ports:
       - 3306:3306
@@ -38,7 +38,7 @@ services:
 
 
   mariadb10db:
-    image: mariadb:10
+    build: db-configs/mariadb
     ports:
       - 3010:3306
     environment:
@@ -55,7 +55,7 @@ services:
 
 
   mssql2019:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    build: db-configs/mssql
     ports:
       - 1433:1433
     environment:
@@ -64,7 +64,13 @@ services:
 
 
   oracle19c:
-    image: docker-registry.ivyteam.io/oracle/database-orapdb:19.3.0-se2
+    build: db-configs/oracle
     ports:
       - 1521:1521
       - 5529:5500
+    volumes:
+      - ./db-configs/oracle/dbca.rsp.tmpl:/opt/oracle/dbca.rsp.tmpl
+    environment:
+      ORACLE_PWD: nimda
+      ORACLE_SID: ORASID
+      ORACLE_PDB: ORAPDB

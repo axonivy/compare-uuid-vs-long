@@ -1,0 +1,349 @@
+package com.axonivy.compare;
+
+import java.sql.*;
+import java.util.*;
+
+public class DatabaseCreateUtil {
+
+  private static final List<Database> databases = createDatabases();
+
+  private static List<Database> createDatabases() {
+    var databases = new ArrayList<Database>();
+    var defaultPassword = "nimda";
+    databases.add(new Database("postgresql", "jdbc:postgresql://localhost:5432/", "postgres", "postgres", defaultPassword));
+    databases.add(new Database("mariadb", "jdbc:mariadb://localhost:3010/", "comparePerformance", "root", defaultPassword));
+    databases.add(new Database("mysql", "jdbc:mysql://localhost:3306/", "comparePerformance", "root", defaultPassword));
+    databases.add(new Database("sqlserver", "jdbc:sqlserver://localhost:1433;encrypt=false", "comparePerformance", "sa", "secure1234PASSWORD!"));
+    databases.add(new Database("oracle", "jdbc:oracle:thin:@//localhost:1521/ORAPDB", "comparePerformance", "system", defaultPassword));
+    return databases;
+  }
+
+  public static List<Database> getDatabases() {
+    return databases;
+  }
+
+  public static List<String> getTableTypeNames() {
+    return Arrays.asList("Long", "Uuid", "RawUuid");
+  }
+
+  public static void create() {
+    for (var database : getDatabases()) {
+      if (!database.type().equals("postgresql") && !database.type().equals("oracle")) {
+        createDatabase(database);
+      }
+      createTables(database);
+    }
+  }
+
+  private static void createDatabase(Database db) {
+    System.out.println("\nCreating database in " + db.type());
+    try (Connection connection = getConnectionRaw(db)) {
+      System.out.println("Connected with DB: " + db.type());
+      try (ResultSet resultSet = connection.getMetaData().getCatalogs()) {
+        var databaseExists = false;
+        while (resultSet.next()) {
+          if (resultSet.getString(1).equals(db.databaseName())) {
+            databaseExists = true;
+            break;
+          }
+        }
+      if (!databaseExists) {
+        try (Statement statement = connection.createStatement()) {
+          var script = "CREATE DATABASE IF NOT EXISTS ";
+          if (db.type().equals("sqlserver"))
+            script = "CREATE DATABASE ";
+          statement.executeUpdate(script + "comparePerformance");
+        }
+      }
+    }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+  }
+
+  public static void createTables(Database db) {
+    try (Connection connection = getConnection(db)) {
+      System.out.println("Creating tables for database: " + db.type());
+      try(Statement statement = connection.createStatement()) {
+        for (var tableType : getTableTypeNames()) {
+          statement.executeUpdate(createSecurityMemberSqlStatement(db, tableType));
+          statement.executeUpdate(createTaskTableSqlStatement(db, tableType));
+          if (db.type().equals("postgresql") || db.type().equals("oracle")) {
+            statement.executeUpdate(createTaskTableIndexesSqlStatement(tableType));
+          }
+        }
+        System.out.println("Member and Task tables created.");
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+  }
+
+  private static String createSecurityMemberSqlStatement(Database db, String tableType) {
+    String idType = getDbIdType(db);
+    var tableName = "SecurityMember" + tableType;
+    var ifNotExists = (!db.type().equals("sqlserver") && !db.type().equals("oracle") ? "IF NOT EXISTS " : "");
+    return "CREATE TABLE " + ifNotExists + tableName + " (" +
+            "Id " + (tableType.contains("Long") ? idType : "VARCHAR(255) NOT NULL") + "," +
+            "Name VARCHAR(255) NOT NULL," +
+            "PRIMARY KEY (Id)" +
+            ")";
+  }
+
+  private static String createTaskTableSqlStatement(Database db, String tableType) {
+    String idType = getDbIdType(db);
+    var tableName = "Task" + tableType;
+    var numberType = (db.type().equals("oracle") ? "NUMBER," : "BIGINT,");
+    var ifNotExists = (!db.type().equals("sqlserver") && !db.type().equals("oracle") ? "IF NOT EXISTS " : "");
+    return "CREATE TABLE " + ifNotExists + tableName + " ("
+            + "Id " + idType + ","
+            + "UserId " + (tableType.contains("Long") ? numberType : "VARCHAR(255),")
+            + "PRIMARY KEY (Id),"
+            + "FOREIGN KEY (UserId) REFERENCES SecurityMember" + tableType + "(Id)"
+            + (!db.type().equals("postgresql") && !db.type().equals("oracle") ? ",INDEX " + tableName + "_UserId_idx (UserId)" : "")
+            + ")";
+  }
+
+  private static String createTaskTableIndexesSqlStatement(String tableType) {
+    var tableName = "Task" + tableType;
+    return "CREATE INDEX " + tableName + "_UserId_idx ON " + tableName + " (UserId)";
+  }
+
+  private static String getDbIdType(Database db) {
+    return switch (db.type()) {
+      case "postgresql" -> "SERIAL";
+      case "sqlserver" -> "BIGINT IDENTITY(1,1)";
+      case "oracle" -> "NUMBER GENERATED BY DEFAULT AS IDENTITY";
+      default -> "BIGINT AUTO_INCREMENT";
+    };
+  }
+
+  public static void generateSecMemberEntries(Database db, int amountOfEntries) {
+    var tableIndex = 1;
+    for (var table : getTableTypeNames()) {
+      var amountToCreate = calcEntriesToCreate(db, "SecurityMember"+table, amountOfEntries);
+      if (amountToCreate <= 0) {
+        System.out.println("Entries already exist in " + db.type() + " SecurityMember" + table + " table.");
+        tableIndex++;
+        continue;
+      }
+      System.out.println("\nGenerating " + amountToCreate + " members for table: SecurityMember" + table + "... (" + db.type() + " " + tableIndex + "/" + getTableTypeNames().size() + ")");
+      long startTime = System.nanoTime();
+      massInsertSecurityMembersToDb(db, "SecurityMember" + table, amountToCreate);
+      long elapsedTime = System.nanoTime() - startTime;
+      var prettyTime = prettyTime(elapsedTime / 1000000);
+      System.out.println("\nCreated " + amountToCreate + " entries after " + prettyTime + " in table: SecurityMember" + table);
+      tableIndex++;
+    }
+  }
+
+  public static void massInsertSecurityMembersToDb(Database db, String tableName, int count) {
+    var createMemberStatement = "INSERT INTO " + tableName + " (Name) VALUES (?)";
+    if (!tableName.contains("Long")) {
+      createMemberStatement = "INSERT INTO " + tableName + " (Name, Id) VALUES (?, ?)";
+    }
+    try (Connection connection = getConnection(db)) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement)) {
+        int batchTotal=0;
+        for (var i = 0; i < count; i++) {
+          if ((count >= 100000) && (i % (count / 10) == 0)) {
+            System.out.println("Prepared " + i + " members (" + ((i*100)/count) + "%)");
+            connection.commit();
+          }
+          preparedStatement.setString(1, "user" + i);
+          if (!tableName.contains("Long")) {
+            var uuid = UUID.randomUUID().toString().toUpperCase();
+            if (tableName.contains("RawUuid")) {
+              preparedStatement.setString(2, uuid);
+            } else {
+              preparedStatement.setString(2, "USER-" + uuid);
+            }
+          }
+          preparedStatement.addBatch();
+          if (batchTotal++ == 4096) {
+            preparedStatement.executeBatch();
+            preparedStatement.clearBatch();
+            batchTotal = 0;
+          }
+        }
+        if (batchTotal > 0) {
+          preparedStatement.executeBatch();
+        }
+        connection.commit();
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+
+  }
+
+  public static void massInsertTaskToDb(Database db, int count) {
+    for (var tableType : getTableTypeNames()) {
+      var tableName = "Task" + tableType;
+      var createMemberStatement = "INSERT INTO " + tableName + " (UserId) VALUES (?)";
+      var amountToCreate = calcEntriesToCreate(db, tableName, count);
+      if (amountToCreate <= 0) {
+        System.out.println("Entries already exist in " + db.type() + " " + tableName + " table.");
+        continue;
+      }
+      System.out.println("\nGenerating " + amountToCreate + " entries in table: " + tableName + ", " + db.type());
+      var users = getRandomUsers(db, tableType, amountToCreate / 10);
+      try (Connection connection = getConnection(db)) {
+        connection.setAutoCommit(false);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement)) {
+          int batchTotal=0;
+          for (var i = 0; i < amountToCreate; i++) {
+            if (i % (amountToCreate / 10) == 0 && i != 0) {
+              System.out.println("Prepared " + i + " tasks (" + ((i/count)*100) + "%)");
+            }
+            var user = users.get(new Random().nextInt(users.size()));
+            if (tableType.contains("Long")) {
+              preparedStatement.setInt(1, Integer.parseInt(user));
+            } else {
+              preparedStatement.setString(1, user);
+            }
+            preparedStatement.addBatch();
+            if (batchTotal++ == 4096) {
+              preparedStatement.executeBatch();
+              preparedStatement.clearBatch();
+              batchTotal = 0;
+            }
+          }
+          if (batchTotal > 0) {
+            preparedStatement.executeBatch();
+          }
+          connection.commit();
+        }
+      } catch (SQLException e) {
+        isConnectionError(e);
+      }
+    }
+    System.out.println("Created " + count + " tasks\n");
+  }
+
+  static int calcEntriesToCreate(Database db, String tableName, int amountOfEntries) {
+    try (Connection connection = getConnection(db)) {
+      try (Statement statement = connection.createStatement()) {
+        System.out.println("\nChecking size of " + db.type() + " " + tableName + " entries...");
+        var resultSet = statement.executeQuery("SELECT COUNT(*) FROM " + tableName);
+        if (resultSet.next()) {
+          var count = resultSet.getInt(1);
+          System.out.println("Found " + count + " entries.");
+          if (count >= amountOfEntries) {
+            return 0;
+          } else {
+            return amountOfEntries - count;
+          }
+        }
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    return 0;
+  }
+
+  static List<String> getRandomUsers(Database db, String tableType, int amount) {
+    var userList = new ArrayList<String>();
+    var randomFunction = "RAND()";
+    if (db.type().equals("postgresql")) {
+      randomFunction = "RANDOM()";
+    }
+    var query = "SELECT Id FROM SecurityMember" + tableType + " ORDER BY " + randomFunction + " LIMIT " + amount;
+    if (db.type().equals("sqlserver")) {
+      query = "SELECT TOP " + amount + " Id FROM SecurityMember" + tableType + " ORDER BY NEWID()";
+    } else if (db.type().equals("oracle")) {
+      query = "SELECT Id FROM (SELECT * FROM SecurityMember" + tableType + " ORDER BY DBMS_RANDOM.RANDOM) WHERE rownum < " + amount;
+    }
+    return addUsersToList(db, userList, query);
+  }
+
+  static List<String> getRandomUsersWithTask(Database db, String tableType, int amount) {
+    var userList = new ArrayList<String>();
+    var randomFunction = "RAND()";
+    if (db.type().equals("postgresql")) {
+      randomFunction = "RANDOM()";
+    }
+    var query = "SELECT UserId FROM Task" + tableType + " ORDER BY " + randomFunction + " LIMIT " + amount;
+    if (db.type().equals("sqlserver")) {
+      query = "SELECT TOP " + amount + " UserId FROM Task" + tableType + " ORDER BY NEWID()";
+    } else if (db.type().equals("oracle")) {
+      query = "SELECT UserId FROM (SELECT * FROM Task" + tableType + " ORDER BY DBMS_RANDOM.RANDOM) WHERE rownum < " + amount;
+    }
+    return addUsersToList(db, userList, query);
+  }
+
+  private static List<String> addUsersToList(Database db, ArrayList<String> userList, String query) {
+    try (Connection connection = DatabaseCreateUtil.getConnection(db)) {
+      try (Statement statement = connection.createStatement()) {
+        try (ResultSet result = statement.executeQuery(query)) {
+          while (result.next()) {
+            if (result.getRow() < 1) {
+              throw new RuntimeException("Could not find random users.");
+            }
+            userList.add(result.getString(1));
+          }
+        }
+      }
+    } catch (SQLException e) {
+      DatabaseCreateUtil.isConnectionError(e);
+    }
+    return userList;
+  }
+
+  public static void cleanupDatabase() {
+    getDatabases().forEach(DatabaseCreateUtil::cleanupDatabase);
+  }
+
+  private static void cleanupDatabase(Database db) {
+    var ifExists = !db.type().equals("oracle") ? "IF EXISTS " : "SYSTEM.";
+    try (Connection connection = getConnection(db)) {
+      try (Statement statement = connection.createStatement()) {
+        for (var table : getTableTypeNames()) {
+          statement.executeUpdate("DROP TABLE " + ifExists + "Task" + table);
+          statement.executeUpdate("DROP TABLE " + ifExists + "SecurityMember" + table);
+        }
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+    System.out.println("Database " + db.type() + " cleaned up.");
+  }
+
+  static Connection getConnection(Database db) throws SQLException {
+    if (db.type().equals("sqlserver"))
+      return DriverManager.getConnection(db.url() + ";databaseName=" + db.databaseName(), db.user(), db.password());
+    if (db.type().equals("mysql"))
+      return DriverManager.getConnection(db.url() + db.databaseName() + "?rewriteBatchedStatements=true", db.user(), db.password());
+    if (db.type().equals("oracle"))
+      return DriverManager.getConnection(db.url(), db.user(), db.password());
+    return DriverManager.getConnection(db.url() + db.databaseName(), db.user(), db.password());
+  }
+
+  public static Connection getConnectionRaw(Database db) throws SQLException {
+    return DriverManager.getConnection(db.url(), db.user(), db.password());
+  }
+
+  static void isConnectionError(Exception e) {
+    var errorStrings = Arrays.asList("connection", "refused");
+    if (errorStrings.stream().allMatch(e.getMessage()::contains)) {
+      System.out.println("Could not connect to database.");
+    }
+    System.out.println(e.getMessage());
+  }
+
+  private static String prettyTime(long timeInMs) {
+    var seconds = timeInMs / 1000;
+    if (seconds <= 60) {
+      return "< 1 minute";
+    } else if (seconds <= 3600) {
+      return (seconds / 60) + " minutes";
+    }
+    var hours = seconds / 3600;
+    var minutes = (seconds % 3600) / 60;
+    if (hours >= 24) {
+      return (hours / 24) + " days " + (hours % 24) + " hours " + minutes + " minutes";
+    }
+    return hours + " hours " + minutes + " minutes";
+  }
+}
