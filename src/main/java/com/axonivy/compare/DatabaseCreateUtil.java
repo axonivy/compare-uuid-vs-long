@@ -188,7 +188,8 @@ public class DatabaseCreateUtil {
         continue;
       }
       System.out.println("\nGenerating " + amountToCreate + " entries in table: " + tableName + ", " + db.type());
-      var users = getRandomUsers(db, tableType, amountToCreate / 10);
+      var amountOfUsers = amountToCreate >= 10000 ? (amountToCreate / 1000) : (amountToCreate / 100);
+      var users = getRandomUsers(db, tableType, amountOfUsers);
       try (Connection connection = getConnection(db)) {
         connection.setAutoCommit(false);
         try (PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement)) {

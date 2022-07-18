@@ -11,12 +11,12 @@ public class Compare {
 
   public static void prepareDb() {
     DatabaseCreateUtil.create();
-    var amountOfEntries = Menu.getIntInput("How many Database entries do you want to create?: ");
+    var amountOfEntries = Menu.getIntInput("How many Database Task entries do you want to create?: ");
     if (amountOfEntries < 1) {
       System.out.println("Invalid input!");
       return;
     }
-    DatabaseCreateUtil.getDatabases().forEach(db -> DatabaseCreateUtil.generateSecMemberEntries(db, amountOfEntries));
+    DatabaseCreateUtil.getDatabases().forEach(db -> DatabaseCreateUtil.generateSecMemberEntries(db, Math.min(amountOfEntries/10, 100000)));
     DatabaseCreateUtil.getDatabases().forEach(db -> DatabaseCreateUtil.massInsertTaskToDb(db, amountOfEntries));
   }
 
@@ -36,7 +36,7 @@ public class Compare {
       df.setRoundingMode(RoundingMode.CEILING);
       System.out.println("\nComparing tables in " + db.type() + " ...");
       for (var tableType : DatabaseCreateUtil.getTableTypeNames()) {
-        var results = DatabaseMeasureUtil.measureFindingTasks(db, tableType);
+        var results = PerformanceTest.measureFindingTasks(db, tableType);
         String keyType = String.format("%8s", tableType);
         var avgQueryTime = df.format(results.averageQueryTimeInMs());
         var maxQueryTime = df.format(results.maxTimeInMs() / 1000000);
