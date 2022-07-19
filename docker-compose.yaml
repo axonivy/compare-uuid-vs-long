@@ -10,16 +10,6 @@ services:
     environment:
       POSTGRES_PASSWORD: nimda
 
-  postgres14:
-    image: dockage/phppgadmin
-    ports:
-      - 8885:80
-    links: 
-      - postgres14db:db
-    environment:
-      PHP_PG_ADMIN_SERVER_HOST: db
-
-
   mysql8db:
     build: db-configs/mysql
     command: --default-authentication-plugin=mysql_native_password
@@ -28,32 +18,12 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: nimda
 
-  mysql8:
-    image: phpmyadmin/phpmyadmin
-    ports:
-      - 8883:80
-    links: 
-      - mysql8db:db
-    environment:      
-      MYSQL_ROOT_PASSWORD: nimda
-
-
   mariadb10db:
     build: db-configs/mariadb
     ports:
       - 3010:3306
     environment:
       MYSQL_ROOT_PASSWORD: nimda
-      
-  mariadb10:
-    image: phpmyadmin/phpmyadmin
-    ports:
-      - 8884:80
-    links: 
-      - mariadb10db:db
-    environment:      
-      MYSQL_ROOT_PASSWORD: nimda
-
 
   mssql2019:
     build: db-configs/mssql
@@ -62,7 +32,6 @@ services:
     environment:
       ACCEPT_EULA: Y
       SA_PASSWORD: secure1234PASSWORD!
-
 
   oracle19c:
     build: db-configs/oracle
