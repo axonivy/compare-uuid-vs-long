@@ -8,13 +8,22 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 
-public class DatabaseMeasureUtil {
+public class PerformanceTest {
+
+  private static int testCount = 100;
+
+  public static void setTestCount(int testCount) {
+    PerformanceTest.testCount = testCount;
+  }
+
+  public static int getTestCount() {
+    return testCount;
+  }
 
   public static QueryPerformanceMeasureResult measureFindingTasks(Database db, String tableType) {
     var queryTimes = new ArrayList<Long>();
     var rowCounts = new ArrayList<Integer>();
     var randomUsers = DatabaseCreateUtil.getRandomUsersWithTask(db, tableType, 100);
-    var testCount = 100;
 
     try (Connection connection = DatabaseCreateUtil.getConnection(db)) {
       for (int j = 0; j < testCount; j++) {

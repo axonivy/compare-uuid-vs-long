@@ -55,11 +55,24 @@ public class Menu {
       case 1 -> Compare.compare(null);
       case 2 -> Compare.prepareDb();
       case 3 -> DatabaseCreateUtil.cleanupDatabase();
-      case 4 -> System.exit(0);
+      case 4 -> changePerformanceTestCount();
+      case 5 -> System.exit(0);
       default -> System.out.println("Invalid input!");
     }
     waitForEnterPress();
     printMainMenu();
+  }
+
+  private static void changePerformanceTestCount() {
+    clearConsole();
+    System.out.println("Currently the performance test is executed " + PerformanceTest.getTestCount() + " times.");
+    System.out.print("Enter the new number of performance tests: ");
+    try {
+      PerformanceTest.setTestCount(Integer.parseInt(scan.nextLine()));
+    } catch (NumberFormatException e) {
+      System.out.println("Invalid input!");
+      changePerformanceTestCount();
+    }
   }
 
   public static void waitForEnterPress() {

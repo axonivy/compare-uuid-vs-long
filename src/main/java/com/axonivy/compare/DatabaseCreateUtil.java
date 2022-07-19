@@ -2,6 +2,7 @@ package com.axonivy.compare;
 
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DatabaseCreateUtil {
 
@@ -132,7 +133,7 @@ public class DatabaseCreateUtil {
       massInsertSecurityMembersToDb(db, "SecurityMember" + table, amountToCreate);
       long elapsedTime = System.nanoTime() - startTime;
       var prettyTime = prettyTime(elapsedTime / 1000000);
-      System.out.println("\nCreated " + amountToCreate + " entries after " + prettyTime + " in table: SecurityMember" + table);
+      System.out.println("Created " + amountToCreate + " entries after " + prettyTime + " in table: SecurityMember" + table);
       tableIndex++;
     }
   }
@@ -188,14 +189,15 @@ public class DatabaseCreateUtil {
         continue;
       }
       System.out.println("\nGenerating " + amountToCreate + " entries in table: " + tableName + ", " + db.type());
-      var users = getRandomUsers(db, tableType, amountToCreate / 10);
+      var amountOfUsers = amountToCreate >= 10000 ? (amountToCreate / 1000) : (amountToCreate / 100);
+      var users = getRandomUsers(db, tableType, amountOfUsers);
       try (Connection connection = getConnection(db)) {
         connection.setAutoCommit(false);
         try (PreparedStatement preparedStatement = connection.prepareStatement(createMemberStatement)) {
           int batchTotal=0;
           for (var i = 0; i < amountToCreate; i++) {
             if (i % (amountToCreate / 10) == 0 && i != 0) {
-              System.out.println("Prepared " + i + " tasks (" + ((i/count)*100) + "%)");
+              System.out.println("Prepared " + i + " tasks (" + ((i/amountToCreate)*100) + "%)");
             }
             var user = users.get(new Random().nextInt(users.size()));
             if (tableType.contains("Long")) {
@@ -289,6 +291,46 @@ public class DatabaseCreateUtil {
       DatabaseCreateUtil.isConnectionError(e);
     }
     return userList;
+  }
+
+  public static void updateIndexStatisticsForQueryAnalyzer() {
+    for(var db : getDatabases()) {
+      if (db.type().equals("oracle")) {
+        gatherOracleSchemaStats();
+      } else if (db.type().equals("mariadb") || db.type().equals("mysql")) {
+        analyzeDbTables(db);
+      }
+    }
+  }
+
+  private static void gatherOracleSchemaStats() {
+    System.out.println("\nGathering schema statistics for Oracle...");
+    String statementStr = "BEGIN\n"+
+            "  dbms_stats.gather_schema_stats(ownname => 'SYSTEM');\n"+
+            "END;";
+    var oracleDb = databases.stream().filter(db -> db.type().equals("oracle")).findFirst().orElse(null);
+    if (oracleDb == null) {
+      System.out.println("Could not find oracle database.");
+      return;
+    }
+    try (Connection connection = getConnection(oracleDb)) {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute(statementStr);
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
+  }
+
+  private static void analyzeDbTables(Database db) {
+    System.out.println("\nAnalyzing tables for " + db.type() + "...");
+    try (Connection connection = getConnection(db)) {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("ANALYZE TABLE SecurityMemberLong, SecurityMemberUuid, SecurityMemberRawUuid, TaskLong, TaskUuid, TaskRawUuid");
+      }
+    } catch (SQLException e) {
+      isConnectionError(e);
+    }
   }
 
   public static void cleanupDatabase() {
