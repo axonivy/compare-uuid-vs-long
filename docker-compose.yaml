@@ -6,6 +6,7 @@ services:
     build: db-configs/postgres
     ports:
       - 5432:5432
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       POSTGRES_PASSWORD: nimda
 
