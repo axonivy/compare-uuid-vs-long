@@ -197,7 +197,7 @@ public class DatabaseCreateUtil {
           int batchTotal=0;
           for (var i = 0; i < amountToCreate; i++) {
             if (i % (amountToCreate / 10) == 0 && i != 0) {
-              System.out.println("Prepared " + i + " tasks (" + ((i/count)*100) + "%)");
+              System.out.println("Prepared " + i + " tasks (" + ((i/amountToCreate)*100) + "%)");
             }
             var user = users.get(new Random().nextInt(users.size()));
             if (tableType.contains("Long")) {

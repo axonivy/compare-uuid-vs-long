@@ -9,10 +9,11 @@ services:
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       POSTGRES_PASSWORD: nimda
+      PGDATA: /var/lib/postgresql/pgdata
 
   mysql8db:
     build: db-configs/mysql
-    command: --default-authentication-plugin=mysql_native_password
+    command: "--default-authentication-plugin=mysql_native_password --datadir=/var/lib/mysql-no-volume"
     ports:
       - 3306:3306
     environment:
@@ -20,6 +21,7 @@ services:
 
   mariadb10db:
     build: db-configs/mariadb
+    command: --datadir=/var/lib/mysql-no-volume
     ports:
       - 3010:3306
     environment:
