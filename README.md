@@ -50,3 +50,19 @@ Results on a database size of 10'000'000 rows of tasks and 100'000 rows of users
 Notice that to MsSql "sendStringParametersAsUnicode=False" connection parameter was added.
 This is because the MsSql Server converts our parameter in prepared statement to a unicode string which takes
 not only a lot of time but also a lot CPU resources.
+
+
+# How to run
+
+Everything should be executed from the root of the project unless specified otherwise.
+
+**Databases public users**
+Go to the build directory and run `docker compose up`.
+It will build fresh postgres, mysql, mariadb, mssql and oracle databases in a docker container.
+
+**Databases intern users**
+Run `docker-compose up`.
+This option will use databases from a private docker registry which already have 100 thousand users and 10 million tasks generated.
+
+The application was coded with Java 17. To build it run `mvn clean install`.
+You can start the application by executing `java -jar target/uuid.vd.long-0.0.1-SNAPSHOT.jar`.

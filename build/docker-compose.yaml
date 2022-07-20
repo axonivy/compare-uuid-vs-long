@@ -2,8 +2,8 @@ version: "3.3"
 
 services:
 
-  postgres14:
-    image: docker-registry.ivyteam.io/db_keys_performance_postgres
+  postgres14db:
+    build: db-configs/postgres
     ports:
       - 5432:5432
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
@@ -11,16 +11,16 @@ services:
       POSTGRES_PASSWORD: nimda
       PGDATA: /var/lib/postgresql/pgdata
 
-  mysql8:
-    image: docker-registry.ivyteam.io/db_keys_performance_mysql
+  mysql8db:
+    build: db-configs/mysql
     command: "--default-authentication-plugin=mysql_native_password --datadir=/var/lib/mysql-no-volume"
     ports:
       - 3306:3306
     environment:
       MYSQL_ROOT_PASSWORD: nimda
 
-  mariadb10:
-    image: docker-registry.ivyteam.io/db_keys_performance_mariadb
+  mariadb10db:
+    build: db-configs/mariadb
     command: --datadir=/var/lib/mysql-no-volume
     ports:
       - 3010:3306
@@ -28,7 +28,7 @@ services:
       MYSQL_ROOT_PASSWORD: nimda
 
   mssql2019:
-    image: docker-registry.ivyteam.io/db_keys_performance_mssql
+    build: db-configs/mssql
     ports:
       - 1433:1433
     environment:
@@ -36,12 +36,12 @@ services:
       SA_PASSWORD: secure1234PASSWORD!
 
   oracle19c:
-    image: docker-registry.ivyteam.io/db_keys_performance_oracledb
+    build: db-configs/oracle
     ports:
       - 1521:1521
       - 5529:5500
     volumes:
-      - ./build/db-configs/oracle/dbca.rsp.tmpl:/opt/oracle/dbca.rsp.tmpl
+      - ./db-configs/oracle/dbca.rsp.tmpl:/opt/oracle/dbca.rsp.tmpl
     environment:
       ORACLE_PWD: nimda
       ORACLE_SID: ORASID
