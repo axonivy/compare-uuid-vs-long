@@ -50,3 +50,10 @@ Results on a database size of 10'000'000 rows of tasks and 100'000 rows of users
 Notice that to MsSql "sendStringParametersAsUnicode=False" connection parameter was added.
 This is because the MsSql Server converts our parameter in prepared statement to a unicode string which takes
 not only a lot of time but also a lot CPU resources.
+
+
+# How to run
+
+To start the databases go to the build directory and run `docker compose up`.
+The application was coded with Java 17. To build it run `mvn clean install` in the root of this project.
+You can start the application by executing `java -jar target/uuid.vd.long-0.0.1-SNAPSHOT.jar` in the root directory.
