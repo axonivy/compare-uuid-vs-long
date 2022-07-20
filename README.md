@@ -54,6 +54,13 @@ not only a lot of time but also a lot CPU resources.
 
 # How to run
 
-To start the databases go to the build directory and run `docker compose up`.
-The application was coded with Java 17. To build it run `mvn clean install` in the root of this project.
-You can start the application by executing `java -jar target/uuid.vd.long-0.0.1-SNAPSHOT.jar` in the root directory.
+Everything should be executed from the root of the project unless specified otherwise.
+
+**Databases public users**
+Go to the build directory and run `docker compose up`.
+
+**Databases intern users**
+Run `docker-compose up`.
+
+The application was coded with Java 17. To build it run `mvn clean install`.
+You can start the application by executing `java -jar target/uuid.vd.long-0.0.1-SNAPSHOT.jar`.
